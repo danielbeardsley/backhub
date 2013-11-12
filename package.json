@@ -1,0 +1,27 @@
+{
+   "name": "backhub",
+   "version": "0.0.1",
+   "author": "Daniel Beardsley <daniel.beardsley@gmail.com>",
+   "description": "Listen to github post-receive hooks and fetch, maintaining a backup of your repos and a reflog",
+
+   "licenses": [{
+      "type": "MIT",
+      "url": "http://opensource.org/licenses/MIT"
+   }],
+
+   "repository": {
+      "type": "git",
+      "url": "https://github.com/danielbeardsley/backhub.git"
+   },
+
+   "dependencies": {
+   },
+
+   "devDependencies" : {
+      "mocha" : "1.14.0"
+   },
+
+   "main": "./backhub.js",
+
+   "scripts": { "test": "mocha" }
+}
