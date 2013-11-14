@@ -1,6 +1,6 @@
 var Backhub      = require('../lib/backhub'),
     fs           = require('fs'),
-    assert       = require('assert');
+    assert       = require('assert')
     // childProcess = require('child_process'),
     testRepoSource   = __dirname + "/../fixtures/repo/"
 
@@ -9,17 +9,31 @@ var testBranch = "aa6b0aa64229caee1b07500334a64de9e1ffcddd",
     master     = "ff47c0e58eef626f912c7e5d80d67d8796f65003"
 
 describe("backhub", function() {
-   var backupDest = tempDir();
+   var backupDest = tempDir()
+   fs.mkdir(backupDest);
    var bh = new Backhub({
       destination: backupDest
-   });
+   })
 
    it("should clone any repos it doesn't know about", function(done) {
       bh.inject(postReceive("repo", "user"), function() {
          assert.fs.exists(backupDest + "/user/repo")
+         done()
+      })
+   })
+})
+
+describe("Misconfigured backhub", function() {
+   it("should throw an error on non-existant dir", function() {
+      assert.throws(function() {
+         var backupDest = tempDir()
+         var bh = new Backhub({
+            destination: backupDest
+         })
       });
-   });
-});
+   })
+})
+
 
 /**
  * A Stripped-down version of the the JSON from a post-receive event.
@@ -47,7 +61,7 @@ function postReceive(repoName, owner) {
 
 function tempDir() {
    return "/tmp/backhub-test-" +
-            Math.floor(Math.random() * 999999);
+            Math.floor(Math.random() * 999999)
 }
 
 assert.fs = {
