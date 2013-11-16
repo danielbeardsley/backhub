@@ -12,7 +12,7 @@ var testBranch = "aa6b0aa64229caee1b07500334a64de9e1ffcddd",
 describe("backhub", function() {
    before(setupFixture);
 
-   var backupDest = tempDir()
+   var backupDest = tempDirName()
    fs.mkdirSync(backupDest);
    var bh = new Backhub({
       destination: backupDest
@@ -32,7 +32,7 @@ describe("backhub", function() {
 describe("Misconfigured backhub", function() {
    it("should throw an error on non-existant dir", function() {
       assert.throws(function() {
-         var backupDest = tempDir()
+         var backupDest = tempDirName()
          var bh = new Backhub({
             destination: backupDest
          })
@@ -80,7 +80,7 @@ function postReceive(repoName, owner) {
    }
 }
 
-function tempDir() {
+function tempDirName() {
    return "/tmp/backhub-test-" +
             Math.floor(Math.random() * 999999)
 }
