@@ -20,12 +20,13 @@ describe("backhub", function() {
 
    it("should clone any repos it doesn't know about", function(done) {
       this.timeout(5000);
-      bh.inject(postReceive("repo", "user"), function() {
-         assert.fs.exists(backupDest + "/user/repo")
+      bh.inject(postReceive("repo", "user"))
+      .then(function() {
+         assert.fs.existsSync(backupDest + "/user/repo")
          assert.fs.isGitRepo(backupDest + "/user/repo").then(function() {
             done()
-         }).done();
-      })
+         }).done()
+      }).done()
    })
 })
 
@@ -86,7 +87,7 @@ function tempDirName() {
 }
 
 assert.fs = {
-   exists: function(path) {
+   existsSync: function(path) {
       assert.ok(fs.existsSync(path), "Should exist: " + path)
    }
 }
