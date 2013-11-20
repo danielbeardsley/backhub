@@ -16,7 +16,8 @@
 
    "dependencies": {
       "mkdirp": "0.3.5",
-      "q"     : "0.9.x"
+      "q"     : "0.9.x",
+      "log"   : "1.4.x"
    },
 
    "devDependencies" : {

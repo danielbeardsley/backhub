@@ -2,30 +2,66 @@ var Backhub      = require('../lib/backhub'),
     fs           = require('fs'),
     assert       = require('assert'),
     Q            = require('q'),
+    Git          = require('./git'),
     exec         = require('child_process').exec,
     testRepoSource   = __dirname + "/../fixtures/repo/"
 
 // Current branch pointers in our test repo.
 var testBranch = "aa6b0aa64229caee1b07500334a64de9e1ffcddd",
-    master     = "ff47c0e58eef626f912c7e5d80d67d8796f65003"
+    master     = "ff47c0e58eef626f912c7e5d80d67d8796f65003",
+    initialCommit = "aac5cd96ddd3173678e3666d677699ea6adce875"
 
 describe("backhub", function() {
-   before(setupFixture);
+   var testRepoPath, repo
+   before(function(done) {
+      Git.newRepo()
+      .then(function (pathToRepo) {
+         testRepoPath = pathToRepo
+         repo = new Git(testRepoPath)
+         done()
+      }).done()
+   })
+
+   after(function() {
+      // scary
+      // rm -r testRepoPath
+   })
 
    var backupDest = tempDirName()
-   fs.mkdirSync(backupDest);
+   fs.mkdirSync(backupDest)
    var bh = new Backhub({
-      destination: backupDest
+      destination: backupDest,
+      logLevel: 'alert'
    })
 
    it("should clone any repos it doesn't know about", function(done) {
-      this.timeout(5000);
-      bh.inject(postReceive("repo", "user"))
+      bh.inject(postReceive("repo", "user", testRepoPath))
       .then(function() {
          assert.fs.existsSync(backupDest + "/user/repo")
-         assert.fs.isGitRepo(backupDest + "/user/repo").then(function() {
-            done()
-         }).done()
+         return assert.fs.isGitRepo(backupDest + "/user/repo",
+           "post-receive notice should have caused a git clone")
+      }).then(done).done()
+   })
+
+   it("should fetch upon a second hook", function(done) {
+      var backup = new Git(backupDest + "/user/repo")
+      bh.inject(postReceive("repo", "user", testRepoPath))
+      .then(function() {
+         assert.fs.existsSync(backupDest + "/user/repo")
+         return assert.fs.isGitRepo(backupDest + "/user/repo")
+      })
+      .then(function() {
+         return repo.pointBranchAt('test-branch', initialCommit)
+      })
+      .then(function() {
+         return bh.inject(postReceive("repo", "user", testRepoPath))
+      })
+      .then(function() {
+         return backup.assertBranchPointsAt('origin/test-branch',
+          initialCommit,
+          "git fetch was not executed upon receiving a hook")
+      }).then(function() {
+         done()
       }).done()
    })
 })
@@ -33,35 +69,24 @@ describe("backhub", function() {
 describe("Misconfigured backhub", function() {
    it("should throw an error on non-existant dir", function() {
       assert.throws(function() {
-         var backupDest = tempDirName()
          var bh = new Backhub({
-            destination: backupDest
+            destination: tempDirName(),
+            logLevel: 'alert'
          })
-      });
+      })
    })
 })
 
 
-/**
- * Because Git doesn't allow adding any files or dirs named .git
- * we can't add the test repo's .git dir directly to the main repo.
- * We must resort to dynamically creating and destroying a
- * "symlink-like" file that points git to a different folder for
- * the actual repo dir.
- *
- * Actual repo dir:        fixtures/repo/git
- * "symlink" to repo dir:  fixtures/repo/.git
- */
-function setupFixture() {
-   // Add a 'git-style' symlink
-   fs.writeFileSync(testRepoSource + '.git', "gitdir: ./git");
-};
+function cleanUpFixture() {
+   fs.unlinkSync(testRepoSource + '.git')
+}
 
 /**
  * A Stripped-down version of the the JSON from a post-receive event.
  * These are the only fields that really affect us.
  */
-function postReceive(repoName, owner) {
+function postReceive(repoName, owner, repoDir) {
    return {
       "created":false,
       "deleted":false,
@@ -76,7 +101,7 @@ function postReceive(repoName, owner) {
             "name": owner || "testuser"
          },
          "private":false,
-         "url": testRepoSource
+         "url": repoDir
       }
    }
 }
@@ -92,14 +117,14 @@ assert.fs = {
    }
 }
 
-assert.fs.isGitRepo = function(dir) {
-   var deferred = Q.defer(); 
+assert.fs.isGitRepo = function(dir, message) {
+   var deferred = Q.defer() 
    exec("git remote -v", {cwd: dir}, function (err, output) {
       if (err) {
-         assert(false, dir + " is not a git repo")
+         assert(false, message || (dir + " is not a git repo"))
       } else {
-         deferred.resolve(output);
+         deferred.resolve()
       }
-   });
-   return deferred.promise;
+   })
+   return deferred.promise
 }
