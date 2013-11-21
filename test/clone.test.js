@@ -4,6 +4,7 @@ var Backhub      = require('../lib/backhub'),
     Q            = require('q'),
     Git          = require('./git'),
     exec         = require('child_process').exec,
+    exists       = require('path').existsSync || fs.existsSync,
     testRepoSource   = __dirname + "/../fixtures/repo/"
 
 // Current branch pointers in our test repo.
@@ -113,7 +114,7 @@ function tempDirName() {
 
 assert.fs = {
    existsSync: function(path) {
-      assert.ok(fs.existsSync(path), "Should exist: " + path)
+      assert.ok(exists(path), "Should exist: " + path)
    }
 }
 
