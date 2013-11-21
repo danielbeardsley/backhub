@@ -15,11 +15,11 @@ clone of the repo.
 
 ## Usage (command line)
 
-   $> backhub [options]          # Starts the backhub server
+    $> backhub [options]          # Starts the backhub server
    
-    --dir /path  Directory in which to store the backups (git clones).
-    --port n     TCP port to listen on for HTTP github post-receive hooks.
-    --jobs n     Number of parallel git commands allowed. If you don't want to
+       --dir /path  Directory in which to store the backups (git clones).
+       --port n     TCP port to listen on for HTTP github post-receive hooks.
+       --jobs n     Number of parallel git commands allowed. If you don't want to
                  overload github or saturate your connection, set this lower.
 
 ## Installation
