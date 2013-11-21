@@ -1,4 +1,5 @@
 # backhub
+[![Build Status](https://travis-ci.org/danielbeardsley/backhub.png?branch=master)](https://travis-ci.org/danielbeardsley/backhub)
 
 backhub creates and keeps up-to-date a backup of all your Github repos.
 
