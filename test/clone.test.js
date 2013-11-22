@@ -1,4 +1,5 @@
 var Backhub      = require('../lib/backhub'),
+    net          = require('net'),
     fs           = require('fs'),
     assert       = require('assert'),
     Q            = require('q'),
@@ -6,6 +7,7 @@ var Backhub      = require('../lib/backhub'),
     exec         = require('child_process').exec,
     exists       = require('path').existsSync || fs.existsSync,
     testRepoSource   = __dirname + "/../fixtures/repo/"
+    testPort     = 59343
 
 // Current branch pointers in our test repo.
 var testBranch = "aa6b0aa64229caee1b07500334a64de9e1ffcddd",
@@ -32,7 +34,8 @@ describe("backhub", function() {
    fs.mkdirSync(backupDest)
    var bh = new Backhub({
       destination: backupDest,
-      logLevel: 'alert'
+      logLevel: 'alert',
+      port: testPort
    })
 
    it("should clone any repos it doesn't know about", function(done) {
@@ -65,6 +68,20 @@ describe("backhub", function() {
          done()
       }).done()
    })
+
+   it.only("should listen on the configured port", function(done) {
+      var conn = net.connect({host:"localhost", port:testPort},
+      function() {
+         conn.end()
+      });
+      conn.on('error', function(hadError) {
+         assert.ok(false, "Error connecting to backhub via tcp")
+      });
+      conn.on('close', function(hadError) {
+         assert(!hadError, "Error connecting to backhub via tcp")
+         done()
+      });
+   });
 })
 
 describe("Misconfigured backhub", function() {
