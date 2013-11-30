@@ -1,5 +1,8 @@
 var Backhub      = require('../lib/backhub'),
+    path         = require('path'),
+    querystring  = require('querystring'),
     net          = require('net'),
+    http         = require('http'),
     fs           = require('fs'),
     assert       = require('assert'),
     Q            = require('q'),
@@ -69,7 +72,7 @@ describe("backhub", function() {
       }).done()
    })
 
-   it.only("should listen on the configured port", function(done) {
+   it("should listen on the configured port", function(done) {
       var conn = net.connect({host:"localhost", port:testPort},
       function() {
          conn.end()
@@ -82,7 +85,20 @@ describe("backhub", function() {
          done()
       });
    });
-})
+
+   it("should accept post-receive notices POSTed in the github format and inject them into the queue", function(done) {
+      var received = Q.defer();
+      bh.inject = function(obj) {
+         received.resolve(obj);
+      }
+      var requested = sendPostReceive('user','repo', testRepoPath)
+      Q.all([requested, received.promise])
+      .spread(function(sentObject, receivedObject) {
+         assert.deepEqual(sentObject, receivedObject);
+         done();
+      }).done();
+   });
+});
 
 describe("Misconfigured backhub", function() {
    it("should throw an error on non-existant dir", function() {
@@ -145,4 +161,33 @@ assert.fs.isGitRepo = function(dir, message) {
       }
    })
    return deferred.promise
+}
+
+function sendPostReceive(user, repo, repoSourceDir) {
+   var deferred = Q.defer();
+   var request = httpRequest()
+   var payload = postReceive(user, repo, repoSourceDir)
+   var body = {
+      payload: JSON.stringify(payload)
+   }
+
+   request.end(querystring.stringify(body))
+
+   request.on('response', function(response) {
+      deferred.resolve(payload);
+   });
+
+   return deferred.promise;
+}
+
+function httpRequest() {
+   return http.request({
+      hostname: 'localhost',
+      port: testPort,
+      method: 'POST',
+      headers: {
+         'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      path: '/post-receive'
+   });
 }
