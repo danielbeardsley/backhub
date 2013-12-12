@@ -76,20 +76,20 @@ describe("backhub", function() {
       var conn = net.connect({host:"localhost", port:testPort},
       function() {
          conn.end()
-      });
+      })
       conn.on('error', function(hadError) {
          assert.ok(false, "Error connecting to backhub via tcp")
-      });
+      })
       conn.on('close', function(hadError) {
          assert(!hadError, "Error connecting to backhub via tcp")
          done()
-      });
-   });
+      })
+   })
 
    it("should accept post-receive notices POSTed in the github format and inject them into the queue", function(done) {
-      var received = Q.defer();
+      var received = Q.defer()
       bh.inject = function(obj) {
-         received.resolve(obj);
+         received.resolve(obj)
       }
       var requested = sendPostReceive('user','repo', testRepoPath)
       Q.all([requested, received.promise])
