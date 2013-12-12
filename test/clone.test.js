@@ -99,6 +99,49 @@ describe("backhub", function() {
          done()
       }).done()
    })
+
+   it("should NOT accept post-receive notices for invalid formats", function(done) {
+      var responses = []
+      bh.inject = function(obj) {
+         assert.ok(false, "Invalid POST format should *not* trigger fetch")
+      }
+      var payload = postReceive('repo', 'user', testRepoPath)
+
+      // Bad format #1
+      var body = {
+         payload: JSON.stringify(payload) + "BAD DATA"
+      }
+      var response = httpRequest(querystring.stringify(body))
+      response.then(assert400Response("Bad JSON")).done()
+      responses.push(response)
+
+      // Bad format #2
+      body = {
+         payloadBAD_DATA: JSON.stringify(payload)
+      }
+      response = httpRequest(querystring.stringify(body))
+      response.then(assert400Response("Bad query string param")).done()
+      responses.push(response)
+
+      // Bad format #3
+      response = httpRequest("BAD_DATA")
+      response.then(assert400Response("Bad query string format")).done()
+      responses.push(response)
+
+      function assert400Response(message) {
+         return function(response) {
+            assert.equal(400, response.statusCode, message)
+         }
+      }
+
+      Q.all(responses).then(function(responseObjs) {
+         responseObjs.forEach(function(response) {
+         })
+         // I guess if the server hasn't crashed and it did send responses,
+         // we're done
+         done()
+      }).done()
+   })
 })
 
 describe("Misconfigured backhub", function() {
@@ -165,20 +208,15 @@ assert.fs.isGitRepo = function(dir, message) {
 }
 
 function sendPostReceive(payload) {
-   var deferred = Q.defer()
    var body = {
       payload: (typeof payload == 'string') ? payload : JSON.stringify(payload)
    }
-   var request = httpRequest(querystring.stringify(body))
-
-   request.on('response', function(response) {
-      deferred.resolve(response)
-   })
-
-   return deferred.promise
+   var response = httpRequest(querystring.stringify(body))
+   return response
 }
 
 function httpRequest(data) {
+   var deferred = Q.defer()
    var request = http.request({
       hostname: 'localhost',
       port: testPort,
@@ -189,7 +227,10 @@ function httpRequest(data) {
       path: '/post-receive'
    })
    if (data) {
-      request.end(data);
+      request.end(data)
    }
-   return request;
+   request.on('response', function(response) {
+      deferred.resolve(response)
+   })
+   return deferred.promise
 }
