@@ -91,14 +91,15 @@ describe("backhub", function() {
       bh.inject = function(obj) {
          received.resolve(obj)
       }
-      var requested = sendPostReceive('user','repo', testRepoPath)
+      var payload = postReceive('repo', 'user', testRepoPath)
+      var requested = sendPostReceive(payload)
       Q.all([requested, received.promise])
-      .spread(function(sentObject, receivedObject) {
-         assert.deepEqual(sentObject, receivedObject);
-         done();
-      }).done();
-   });
-});
+      .spread(function(response, injectedObject) {
+         assert.deepEqual(payload, injectedObject)
+         done()
+      }).done()
+   })
+})
 
 describe("Misconfigured backhub", function() {
    it("should throw an error on non-existant dir", function() {
@@ -163,25 +164,22 @@ assert.fs.isGitRepo = function(dir, message) {
    return deferred.promise
 }
 
-function sendPostReceive(user, repo, repoSourceDir) {
-   var deferred = Q.defer();
-   var request = httpRequest()
-   var payload = postReceive(user, repo, repoSourceDir)
+function sendPostReceive(payload) {
+   var deferred = Q.defer()
    var body = {
-      payload: JSON.stringify(payload)
+      payload: (typeof payload == 'string') ? payload : JSON.stringify(payload)
    }
-
-   request.end(querystring.stringify(body))
+   var request = httpRequest(querystring.stringify(body))
 
    request.on('response', function(response) {
-      deferred.resolve(payload);
-   });
+      deferred.resolve(response)
+   })
 
-   return deferred.promise;
+   return deferred.promise
 }
 
-function httpRequest() {
-   return http.request({
+function httpRequest(data) {
+   var request = http.request({
       hostname: 'localhost',
       port: testPort,
       method: 'POST',
@@ -189,5 +187,9 @@ function httpRequest() {
          'Content-Type': 'application/x-www-form-urlencoded'
       },
       path: '/post-receive'
-   });
+   })
+   if (data) {
+      request.end(data);
+   }
+   return request;
 }
