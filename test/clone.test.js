@@ -8,7 +8,7 @@ var Backhub      = require('../lib/backhub').Backhub,
     Q            = require('q'),
     Git          = require('./git'),
     exec         = require('child_process').exec,
-    exists       = require('path').existsSync || fs.existsSync,
+    exists       = fs.existsSync || require('path').existsSync,
     testRepoSource   = __dirname + "/../fixtures/repo/"
     testPort     = 59343
 
