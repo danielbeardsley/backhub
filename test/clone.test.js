@@ -1,4 +1,4 @@
-var Backhub      = require('../lib/backhub'),
+var Backhub      = require('../lib/backhub').Backhub,
     path         = require('path'),
     querystring  = require('querystring'),
     net          = require('net'),
