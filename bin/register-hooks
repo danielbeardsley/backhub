@@ -1,0 +1,98 @@
+#!/usr/bin/env node
+var Octonode = require('octonode');
+var optimist = require('optimist');
+var userpass = require('../lib/user-pass.js');
+var log = require('../lib/log.js');
+var Q = require('q');
+var argv = optimist.
+     usage("Usage: $0 --repo=user/reponame --url=http://hookurl").
+     demand(["repo", "url"]).argv
+
+
+userpass().then(function(info) {
+   var client = Octonode.client(info.token || info);
+   var repo = client.repo(argv.repo);
+   var register = getHookRegisterer(client, argv.url);
+
+   register(repo).done()
+}).done();
+
+function getHookRegisterer(client, hookUrl) {
+   hookUrl += (/\?/.test(hookUrl) ? '&' : '?') + "backhub-hook=1";
+   return function register(repo) {
+      log.info(repo.name + " - begin");
+      return preventDuplicateHooks(repo).
+      then(function (repo) {
+         if (repo) {
+            registerOurHook(repo)
+         }
+      })
+   }
+
+   function preventDuplicateHooks(repo) {
+      return getHooks(repo).then(function(hooks) {
+         if (hasOurHook(hooks, repo)) {
+            log.warning(repo.name + " - Hook is already registered")
+            return false
+         }
+         return repo
+      })
+   }
+
+   /**
+    * Returns a promise for an array of existing hooks registered on the given
+    * repo.
+    *
+    * @param $repo an octonode 'repo' object
+    */
+   function getHooks(repo) {
+      log.info(repo.name + " - get existing hooks");
+      var deferred = Q.defer();
+      repo.hooks(function(err, hooks) {
+         if (err) {
+            log.error(repo.name + " - Error received existing hooks: " + err);
+            deferred.reject(err)
+         } else {
+            log.info(repo.name + " - received existing hooks (" + hooks.length + ")");
+            deferred.resolve(hooks)
+         }
+      })
+      return deferred.promise
+   }
+
+   /**
+    * Note: repo is only passed for logging
+    */
+   function hasOurHook(hooks, repo) {
+      return hooks.some(function(hook) {
+         var url = hook.config && hook.config.url;
+         if (url) {
+            log.info(repo.name + " - checking hook:" + url);
+            return /backhub-hook/.test(url)
+         }
+      })
+   }
+
+   function registerOurHook(repo) {
+      var deferred = Q.defer();
+      log.debug(repo.name + " - registering hook:" + hookUrl);
+      repo.hook({
+         "name": "web",
+         "active": true,
+         "events": ["push"], // Pretty much only care about updates to branch pointers
+         "config": {
+            "url": hookUrl
+         }
+      }, function(err, registered) {
+         if (err) {
+            log.error(repo.name + " - Error registering hook: " + err);
+            deferred.reject(err)
+         } else {
+            log.info(repo.name + " - Registered hook successfully");
+            deferred.resolve(true)
+         }
+      });
+      return deferred.promise;
+   }
+
+}
