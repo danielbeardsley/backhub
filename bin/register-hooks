@@ -32,7 +32,7 @@ function getHookRegisterer(client, hookUrl) {
    function preventDuplicateHooks(repo) {
       return getHooks(repo).then(function(hooks) {
          if (hasOurHook(hooks, repo)) {
-            log.warning(repo.name + " - Hook is already reistered")
+            log.warning(repo.name + " - Hook is already registered")
             return false
          }
          return repo
