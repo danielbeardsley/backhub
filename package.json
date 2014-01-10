@@ -17,7 +17,9 @@
    "dependencies": {
       "optimist": "0.6.0",
       "q"     : "0.9.x",
-      "log"   : "1.4.x"
+      "log"   : "1.4.x",
+      "octonode": "0.4.x",
+      "read"  : "1.0.x"
    },
 
    "devDependencies" : {
