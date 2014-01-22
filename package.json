@@ -19,7 +19,8 @@
       "q"     : "0.9.x",
       "log"   : "1.4.x",
       "octonode": "0.4.x",
-      "read"  : "1.0.x"
+      "read"  : "1.0.x",
+      "shellwords" : "0.1.x"
    },
 
    "devDependencies" : {
