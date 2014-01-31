@@ -5,8 +5,14 @@ var userpass = require('../lib/user-pass.js');
 var log = require('../lib/log.js');
 var Q = require('q');
 var argv = optimist.
-     usage("Usage: $0 --repo=user/reponame --url=http://hookurl").
-     demand(["url"]).argv
+     usage("Usage: $0 (--repo=owner/repo|--org=org|--user) --url=http://hookurl [--remove]").
+     demand(["url"]).
+     describe("url","hook url that backub will be listening to (backhub does't care about path, all requests are processed)").
+     describe("repo","register the hook [url] on the specified repo (repo == 'owner/name')").
+     describe("org","register the hook [url] on all repos owned by the specified organization").
+     describe("user","register the hook [url] on all repos owned by the authenticated user").
+     describe("remove","remove hook instead of add (no value)").
+     argv;
 
 userpass().then(function(info) {
    var client = Octonode.client(info.token || info);
