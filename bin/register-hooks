@@ -6,16 +6,70 @@ var log = require('../lib/log.js');
 var Q = require('q');
 var argv = optimist.
      usage("Usage: $0 --repo=user/reponame --url=http://hookurl").
-     demand(["repo", "url"]).argv
+     demand(["url"]).argv
 
 
 userpass().then(function(info) {
    var client = Octonode.client(info.token || info);
-   var repo = client.repo(argv.repo);
-   var register = getHookRegisterer(client, argv.url);
-
-   register(repo).done()
+   return chooseRepos(client).
+   then(registerEachRepo(client));
 }).done();
+
+/**
+ * Returns a promise for an array of "owner/repo" strings based on command line
+ * arguments.
+ */
+function chooseRepos(client) {
+   var deferred = Q.defer();
+   if (argv.repo) {
+      deferred.resolve([argv.repo]);
+   } else if (argv.user) {
+      getAllReposFrom(client.me());
+   } else if (argv.org) {
+      getAllReposFrom(client.org(argv.org));
+   } else {
+      log.error("Must specify --org=name, --repo=user/name, or --user");
+      process.exit(1);
+   }
+
+   function getAllReposFrom(clientObject) {
+      traverseAllPages(clientObject, 'repos').then(function(repos) {
+         deferred.resolve(repos.map(getRepoFullName))
+      });
+   }
+
+   function getRepoFullName(repo) {
+      return repo.full_name;
+   }
+
+   return deferred.promise;
+}
+
+/**
+ * Returns a function that will register a hook on a passed array of repos and
+ * return a promise for it's completion.
+ */
+function registerEachRepo(client) {
+   var register = getHookRegisterer(client, argv.url);
+   return function(repos) {
+      var deferred = Q.defer();
+
+      function dequeue() {
+         var repo = repos.pop();
+         if (!repo) {
+            return deferred.resolve();
+         }
+         register(repo).then(function() {
+            dequeue();
+         }, function(err) {
+            log.error("FAILED while registering hook for " + repo.name);
+            dequeue();
+         });
+      }
+
+      return deferred.promise;
+   }
+}
 
 function getHookRegisterer(client, hookUrl) {
    hookUrl += (/\?/.test(hookUrl) ? '&' : '?') + "backhub-hook=1";
@@ -50,7 +104,7 @@ function getHookRegisterer(client, hookUrl) {
       var deferred = Q.defer();
       repo.hooks(function(err, hooks) {
          if (err) {
-            log.error(repo.name + " - Error received existing hooks: " + err);
+            log.error(repo.name + " - Error retreiving existing hooks: " + err);
             deferred.reject(err)
          } else {
             log.info(repo.name + " - received existing hooks (" + hooks.length + ")");
@@ -95,4 +149,37 @@ function getHookRegisterer(client, hookUrl) {
       return deferred.promise;
    }
 
+}
+
+/**
+ * Returns a promise for an array of all items from a paginated resource.
+ * i.e. client.me().repos() is paginated.
+ * Example:
+ * traverseAllPages(client.me(),'repos').then(function(reposArray) {});
+ */
+function traverseAllPages(client, methodName) {
+   var deferred = Q.defer();
+   var results = [];
+   function getPage(page) {
+      log.info("Retrieving page " + page);
+      client[methodName](page, function(err, data, headers) {
+         if (err) {
+            log.err("Error: " + err);
+            promise.reject(err)
+         }
+         log.info("Retrieved " + data.length + " results on page " + page);
+         results = results.concat(data);
+
+         var linkHeader = headers.link;
+         if (/; rel="last"/.test(headers.link)) {
+            getPage(page + 1);
+         } else {
+            log.info("Got " + results.length + " results");
+            deferred.resolve(results);
+         }
+      });
+   }
+
+   getPage(1);
+   return deferred.promise;
 }
