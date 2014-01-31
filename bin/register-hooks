@@ -8,7 +8,6 @@ var argv = optimist.
      usage("Usage: $0 --repo=user/reponame --url=http://hookurl").
      demand(["url"]).argv
 
-
 userpass().then(function(info) {
    var client = Octonode.client(info.token || info);
    return chooseRepos(client).
@@ -22,10 +21,13 @@ userpass().then(function(info) {
 function chooseRepos(client) {
    var deferred = Q.defer();
    if (argv.repo) {
+      log.info("Registering for " + argv.repo);
       deferred.resolve([argv.repo]);
    } else if (argv.user) {
+      log.info("Registering for all repos owned by " + argv.user);
       getAllReposFrom(client.me());
    } else if (argv.org) {
+      log.info("Registering for all repos owned by " + argv.org);
       getAllReposFrom(client.org(argv.org));
    } else {
       log.error("Must specify --org=name, --repo=user/name, or --user");
@@ -50,7 +52,7 @@ function chooseRepos(client) {
  * return a promise for it's completion.
  */
 function registerEachRepo(client) {
-   var register = getHookRegisterer(client, argv.url);
+   var register = getHookRegisterer(client, argv.url, argv.remove);
    return function(repos) {
       var deferred = Q.defer();
 
@@ -62,34 +64,42 @@ function registerEachRepo(client) {
          register(repo).then(function() {
             dequeue();
          }, function(err) {
-            log.error("FAILED while registering hook for " + repo.name);
+            log.error("FAILED while registering hook for " + repo.name + " : " + err);
             dequeue();
          });
       }
+      dequeue();
 
       return deferred.promise;
    }
 }
 
-function getHookRegisterer(client, hookUrl) {
+function getHookRegisterer(client, hookUrl, remove) {
    hookUrl += (/\?/.test(hookUrl) ? '&' : '?') + "backhub-hook=1";
-   return function register(repo) {
+   log.info("Getting hook registerer for");
+   return function register(repoName) {
+      var repo = client.repo(repoName);
       log.info(repo.name + " - begin");
-      return preventDuplicateHooks(repo).
-      then(function (repo) {
-         if (repo) {
-            registerOurHook(repo)
+      return findOurHookOnRepo(repo).
+      then(function (hook) {
+         if (remove && hook) {
+            return unRegisterOurHook(repo, hook);
+         } else if (!remove && !hook) {
+            return registerOurHook(repo)
+         } else {
+            log.info("Nothing to do");
          }
       })
    }
 
-   function preventDuplicateHooks(repo) {
+   function findOurHookOnRepo(repo) {
       return getHooks(repo).then(function(hooks) {
-         if (hasOurHook(hooks, repo)) {
-            log.warning(repo.name + " - Hook is already registered")
-            return false
+         var hook = findOurHook(hooks, repo);
+
+         if (hook) {
+            log.info(repo.name + " - Hook is already registered")
          }
-         return repo
+         return hook;
       })
    }
 
@@ -117,14 +127,17 @@ function getHookRegisterer(client, hookUrl) {
    /**
     * Note: repo is only passed for logging
     */
-   function hasOurHook(hooks, repo) {
-      return hooks.some(function(hook) {
+   function findOurHook(hooks, repo) {
+      for(var i=0; i<hooks.length; i++) {
+         var hook = hooks[i];
          var url = hook.config && hook.config.url;
          if (url) {
             log.info(repo.name + " - checking hook:" + url);
-            return /backhub-hook/.test(url)
+            if (/backhub-hook/.test(url)) {
+               return hook;
+            }
          }
-      })
+      }
    }
 
    function registerOurHook(repo) {
@@ -145,6 +158,19 @@ function getHookRegisterer(client, hookUrl) {
             log.info(repo.name + " - Registered hook successfully");
             deferred.resolve(true)
          }
+      });
+      return deferred.promise;
+   }
+
+   function unRegisterOurHook(repo, hook) {
+      var deferred = Q.defer();
+      log.debug(repo.name + " - removing hook:" + hookUrl);
+      repo.client.del("/repos/"+repo.name+"/hooks/" + hook.id, {},
+      function (err, status, body, headers) {
+         if (err) return deferred.reject(err);
+         if (status != 204) return deferred.reject(new Error("HTTP status: " + status));
+         log.info(repo.name + " - Removed hook successfully");
+         deferred.resolve();
       });
       return deferred.promise;
    }
